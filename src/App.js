@@ -3,6 +3,8 @@ import { composeAPI } from "@iota/core";
 import { CopyToClipboard } from "react-copy-to-clipboard";
 import "./App.css";
 import moment from "moment";
+import { withAlert } from "react-alert";
+import { errorOptions, infoOptions, successOptions } from "./alertOptios";
 
 let defaultSeed =
   "RTJCKLYRPFQH9OYS9RDZCWBR9KXLUGYWZSRZLLMCWXPU9HUSBRWVVTVFZKMQXO99YATFIEZVGZTK9CBB9"; // most tx and balance
@@ -12,7 +14,7 @@ const testNodeURL = "https://nodes.devnet.iota.org:443";
 const depth = 3;
 const minWeightMagnitude = 14;
 
-function App() {
+function App({ alert }) {
   // loaders
   const [transactionSending, setTransactionSending] = useState(false);
   const [accountInfoLoading, setAccountInfoLoading] = useState(false);
@@ -104,6 +106,7 @@ function App() {
     startIndex = 0,
     securityLevel = 2
   ) => {
+    alert.show("Preparing wallet!", infoOptions);
     setAccountInfoLoading(true);
     getBalance(iota, seed);
     const details = await iota.getAccountData(seed, {
@@ -120,6 +123,7 @@ function App() {
     }
     setAccountData({ ...details, transfers: details.transfers.reverse() });
     setAccountInfoLoading(false);
+    alert.show("Wallet setup successfulyy!", successOptions);
     localStorage.setItem("tx", JSON.stringify(details));
     console.log(details);
   };
@@ -130,6 +134,7 @@ function App() {
     startIndex = 0,
     securityLevel = 2
   ) => {
+    alert.show("Refreshing wallet...", infoOptions);
     setAccountInfoRefreshLoading(true);
     const details = await iota.getAccountData(seed, {
       start: startIndex,
@@ -144,15 +149,19 @@ function App() {
       }
     }
     setAccountData({ ...details, transfers: details.transfers.reverse() });
+    alert.show("Wallet refreshed successfully", successOptions);
     setAccountInfoRefreshLoading(false);
   };
 
   const generateAndAttachNewAddress = async (iota, seed) => {
+    alert.show("Generating new address", infoOptions);
     setGeneratedAddressStatus("Generating...");
     const newAddress = await iota.getNewAddress(seed);
+    alert.show("Address generated successfully", successOptions);
+    alert.show("Attaching new address to the tange", infoOptions);
     setGeneratedAddressStatus("");
     setGeneratedAddress(newAddress);
-    sendTransaction(iota, seed, newAddress, 0);
+    sendTransaction(iota, seed, newAddress, 0, "", true);
   };
 
   const getBalance = async (iota, seed) => {
@@ -178,25 +187,30 @@ function App() {
     seed,
     reciepientAddress,
     value,
-    tag = ""
+    tag = "",
+    attachmentTx
   ) => {
     if (reciepientAddress.length !== 81) {
-      alert("Invalid address! Address must have exactly 81 characters");
+      alert.show(
+        "Invalid address! Address must have exactly 81 characters",
+        errorOptions
+      );
       return;
     }
     const pattern = new RegExp("^[A-Z9]+$");
     if (!pattern.test(reciepientAddress)) {
-      alert(
-        "Invalid address! Can't contain character other than capital letters and numbers"
+      alert.show(
+        "Invalid address! Can't contain character other than capital letters and numbers",
+        errorOptions
       );
       return;
     }
     if (value < 0) {
-      alert("Negative amount can't be payed");
+      alert.show("Negative amount can't be payed", errorOptions);
       return;
     }
     if (value > balance) {
-      alert("Insufficient funds!");
+      alert.show("Insufficient funds!", errorOptions);
       return;
     }
     setTransactionSending(true);
@@ -208,12 +222,26 @@ function App() {
         tag: tag
       }
     ];
+    if (!attachmentTx) {
+      alert.show(`Sending ${value}i`, infoOptions);
+    }
     console.log(`Sending ${value}i to ${reciepientAddress}`);
 
     try {
       // Construct bundle and convert to trytes
+      if (!attachmentTx) {
+        setTimeout(() => {
+          alert.show("Transaction created successfully", successOptions);
+        }, 1000)
+      }
       const trytes = await iota.prepareTransfers(seed, transfers);
+      if (!attachmentTx) {
+        alert.show("Sending Transaction", infoOptions);
+      }
       const res = await iota.sendTrytes(trytes, depth, minWeightMagnitude);
+      if (!attachmentTx) {
+        alert.show("Transaction sent successfully", successOptions);
+      }
       setTransactionSending(false);
       setAccountData({
         ...accountData,
@@ -225,7 +253,10 @@ function App() {
       res.map(tx => console.log(tx));
     } catch (e) {
       setTransactionSending(false);
-      alert("Error occured while sending transaction", e.message);
+      alert.show(
+        `Error occured while sending transaction ${e.message}`,
+        errorOptions
+      );
       console.log(e);
     }
   };
@@ -256,7 +287,9 @@ function App() {
       Address:{" "}
       <CopyToClipboard
         text={address}
-        onCopy={() => alert("Address copied to the clipboard")}
+        onCopy={() =>
+          alert.show("Address copied to the clipboard", successOptions)
+        }
       >
         <span className="address">{address}</span>
       </CopyToClipboard>
@@ -430,4 +463,4 @@ function App() {
   );
 }
 
-export default App;
+export default withAlert()(App);
