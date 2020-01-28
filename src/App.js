@@ -182,6 +182,36 @@ function App({ alert }) {
     }
   };
 
+  const getLastUnusedAddress = () => {
+    const { transfers, addresses } = accountData;
+    // const unusedAddress = addresses.find(
+    //   address =>
+    //     !transfers.find(transfer => {
+    //       if (transfer.length === 1) return false;
+    //       const lastIndex = transfer[0].lastIndex;
+    //       for (let i = 0; i <= lastIndex; i++) {
+    //         if (transfer[i].value < 0 && transfer[i].address === address) {
+    //           return true;
+    //         }
+    //       }
+    //     })
+    // );
+    const unusedAddress = addresses.find(
+      address =>
+        !transfers.find(
+          transfer =>
+            transfer.length !== 1 &&
+            transfer.find(t => t.value < 0 && t.address === address)
+        )
+    );
+    if (unusedAddress) {
+      copyAddressToClipboard(unusedAddress);
+      alert.show("Address copied to the clipboard", successOptions);
+    } else {
+      alert.show("No unused address found", errorOptions);
+    }
+  };
+
   const sendTransaction = async (
     iota,
     seed,
@@ -232,7 +262,7 @@ function App({ alert }) {
       if (!attachmentTx) {
         setTimeout(() => {
           alert.show("Transaction created successfully", successOptions);
-        }, 1000)
+        }, 1000);
       }
       const trytes = await iota.prepareTransfers(seed, transfers);
       if (!attachmentTx) {
@@ -281,6 +311,15 @@ function App({ alert }) {
   };
 
   const isMyAddress = address => accountData.addresses.find(a => a === address);
+
+  const copyAddressToClipboard = address => {
+    const el = document.createElement("textarea");
+    el.value = address;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand("copy");
+    document.body.removeChild(el);
+  };
 
   const renderAddress = address => (
     <>
@@ -352,6 +391,13 @@ function App({ alert }) {
         </button>
       </div>
       <div className="divider" />
+      <button
+        onClick={getLastUnusedAddress}
+        disabled={!isAccountSetup}
+        style={{ marginRight: "10px" }}
+      >
+        Get last unused address
+      </button>
       <button
         onClick={() => generateAndAttachNewAddress(iota, seed)}
         disabled={
