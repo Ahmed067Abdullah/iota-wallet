@@ -5,14 +5,12 @@ import "./App.css";
 import moment from "moment";
 import { withAlert } from "react-alert";
 import { errorOptions, infoOptions, successOptions } from "./alertOptios";
-
-let defaultSeed =
-  "RTJCKLYRPFQH9OYS9RDZCWBR9KXLUGYWZSRZLLMCWXPU9HUSBRWVVTVFZKMQXO99YATFIEZVGZTK9CBB9"; // most tx and balance
-defaultSeed =
-  "ATJCKLYRPFQH9OYS9RDZCWBR9KXLUGYWZSRZLLMCWXPU9HUSBRWVVTVFZKMQXO99YATFIEZVGZTK9CBBA";
-const testNodeURL = "https://nodes.devnet.iota.org:443";
-const depth = 3;
-const minWeightMagnitude = 14;
+import {
+  isMyAddress,
+  getSpendAmountFromBundle,
+  getLastUnusedAddress
+} from "./helper";
+import { defaultSeed, minWeightMagnitude, depth, testNodeURL } from "./config";
 
 function App({ alert }) {
   // loaders
@@ -60,7 +58,10 @@ function App({ alert }) {
           sentTo = transactionBundle[i].address;
         }
         if (transactionBundle[i].value < 0) {
-          outgoing = isMyAddress(transactionBundle[i].address);
+          outgoing = isMyAddress(
+            accountData.addresses,
+            transactionBundle[i].address
+          );
           break;
         }
       }
@@ -68,9 +69,9 @@ function App({ alert }) {
       const confirmedBundle = accountData.transfers.find(
         bundle => bundle[0].hash === txHash
       );
-      if (outgoing && !isMyAddress(sentTo)) {
+      if (outgoing && !isMyAddress(accountData.addresses, sentTo)) {
         setBalance(balance - getSpendAmountFromBundle(confirmedBundle));
-      } else if (!outgoing && isMyAddress(sentTo)) {
+      } else if (!outgoing && isMyAddress(accountData.addresses, sentTo)) {
         setBalance(balance + getSpendAmountFromBundle(confirmedBundle));
       }
 
@@ -86,19 +87,6 @@ function App({ alert }) {
       });
     }
   }, [pendingTransactionHashes]);
-
-  const getSpendAmountFromBundle = bundle => {
-    const lastIndex = bundle[0].lastIndex;
-    let spendAmount = 0;
-    for (let i = 0; i <= lastIndex; i++) {
-      if (bundle[i].value > 0) {
-        spendAmount += bundle[i].value;
-      } else if (bundle[i].value < 0) {
-        break;
-      }
-    }
-    return spendAmount;
-  };
 
   const getAccountDetails = async (
     iota,
@@ -179,36 +167,6 @@ function App({ alert }) {
     } catch (e) {
       console.log(e);
       return null;
-    }
-  };
-
-  const getLastUnusedAddress = () => {
-    const { transfers, addresses } = accountData;
-    // const unusedAddress = addresses.find(
-    //   address =>
-    //     !transfers.find(transfer => {
-    //       if (transfer.length === 1) return false;
-    //       const lastIndex = transfer[0].lastIndex;
-    //       for (let i = 0; i <= lastIndex; i++) {
-    //         if (transfer[i].value < 0 && transfer[i].address === address) {
-    //           return true;
-    //         }
-    //       }
-    //     })
-    // );
-    const unusedAddress = addresses.find(
-      address =>
-        !transfers.find(
-          transfer =>
-            transfer.length !== 1 &&
-            transfer.find(t => t.value < 0 && t.address === address)
-        )
-    );
-    if (unusedAddress) {
-      copyAddressToClipboard(unusedAddress);
-      alert.show("Address copied to the clipboard", successOptions);
-    } else {
-      alert.show("No unused address found", errorOptions);
     }
   };
 
@@ -310,17 +268,6 @@ function App({ alert }) {
     }, 10000);
   };
 
-  const isMyAddress = address => accountData.addresses.find(a => a === address);
-
-  const copyAddressToClipboard = address => {
-    const el = document.createElement("textarea");
-    el.value = address;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand("copy");
-    document.body.removeChild(el);
-  };
-
   const renderAddress = address => (
     <>
       Address:{" "}
@@ -392,7 +339,7 @@ function App({ alert }) {
       </div>
       <div className="divider" />
       <button
-        onClick={getLastUnusedAddress}
+        onClick={() => getLastUnusedAddress(accountData, alert)}
         disabled={!isAccountSetup}
         style={{ marginRight: "10px" }}
       >
