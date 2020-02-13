@@ -114,6 +114,9 @@ function App({ alert }) {
     alert.show("Wallet setup successfulyy!", successOptions);
     localStorage.setItem("tx", JSON.stringify(details));
     console.log(details);
+
+    // const details = JSON.parse(localStorage.getItem("tx"));
+    // setAccountData(details);
   };
 
   const listenForNewIncomingTransaction = async (
@@ -124,6 +127,7 @@ function App({ alert }) {
   ) => {
     alert.show("Refreshing wallet...", infoOptions);
     setAccountInfoRefreshLoading(true);
+    getBalance(iota, seed);
     const details = await iota.getAccountData(seed, {
       start: startIndex,
       security: securityLevel
