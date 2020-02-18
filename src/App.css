@@ -39,6 +39,7 @@ button:disabled{
 .input-container {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .divider {
@@ -63,13 +64,19 @@ button:disabled{
 .address {
   margin-bottom: -6px;
   font-size: 14px;
-  width: 400px;
+  width: 600px;
   display: inline-block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   padding: 2px 4px;
   user-select: none;
+}
+
+@media(max-width:1000px) {
+  .address {
+    width: calc(100% - 75px);
+  }
 }
 .address:hover{
   background: #ccc;

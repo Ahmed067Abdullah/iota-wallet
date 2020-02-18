@@ -5,14 +5,12 @@ import "./App.css";
 import moment from "moment";
 import { withAlert } from "react-alert";
 import { errorOptions, infoOptions, successOptions } from "./alertOptios";
-
-let defaultSeed =
-  "RTJCKLYRPFQH9OYS9RDZCWBR9KXLUGYWZSRZLLMCWXPU9HUSBRWVVTVFZKMQXO99YATFIEZVGZTK9CBB9"; // most tx and balance
-defaultSeed =
-  "ATJCKLYRPFQH9OYS9RDZCWBR9KXLUGYWZSRZLLMCWXPU9HUSBRWVVTVFZKMQXO99YATFIEZVGZTK9CBBA";
-const testNodeURL = "https://nodes.devnet.iota.org:443";
-const depth = 3;
-const minWeightMagnitude = 14;
+import {
+  isMyAddress,
+  getSpendAmountFromBundle,
+  getLastUnusedAddress
+} from "./helper";
+import { defaultSeed, minWeightMagnitude, depth, testNodeURL } from "./config";
 
 function App({ alert }) {
   // loaders
@@ -60,7 +58,10 @@ function App({ alert }) {
           sentTo = transactionBundle[i].address;
         }
         if (transactionBundle[i].value < 0) {
-          outgoing = isMyAddress(transactionBundle[i].address);
+          outgoing = isMyAddress(
+            accountData.addresses,
+            transactionBundle[i].address
+          );
           break;
         }
       }
@@ -68,9 +69,9 @@ function App({ alert }) {
       const confirmedBundle = accountData.transfers.find(
         bundle => bundle[0].hash === txHash
       );
-      if (outgoing && !isMyAddress(sentTo)) {
+      if (outgoing && !isMyAddress(accountData.addresses, sentTo)) {
         setBalance(balance - getSpendAmountFromBundle(confirmedBundle));
-      } else if (!outgoing && isMyAddress(sentTo)) {
+      } else if (!outgoing && isMyAddress(accountData.addresses, sentTo)) {
         setBalance(balance + getSpendAmountFromBundle(confirmedBundle));
       }
 
@@ -86,19 +87,6 @@ function App({ alert }) {
       });
     }
   }, [pendingTransactionHashes]);
-
-  const getSpendAmountFromBundle = bundle => {
-    const lastIndex = bundle[0].lastIndex;
-    let spendAmount = 0;
-    for (let i = 0; i <= lastIndex; i++) {
-      if (bundle[i].value > 0) {
-        spendAmount += bundle[i].value;
-      } else if (bundle[i].value < 0) {
-        break;
-      }
-    }
-    return spendAmount;
-  };
 
   const getAccountDetails = async (
     iota,
@@ -126,6 +114,9 @@ function App({ alert }) {
     alert.show("Wallet setup successfulyy!", successOptions);
     localStorage.setItem("tx", JSON.stringify(details));
     console.log(details);
+
+    // const details = JSON.parse(localStorage.getItem("tx"));
+    // setAccountData(details);
   };
 
   const listenForNewIncomingTransaction = async (
@@ -136,6 +127,7 @@ function App({ alert }) {
   ) => {
     alert.show("Refreshing wallet...", infoOptions);
     setAccountInfoRefreshLoading(true);
+    getBalance(iota, seed);
     const details = await iota.getAccountData(seed, {
       start: startIndex,
       security: securityLevel
@@ -232,7 +224,7 @@ function App({ alert }) {
       if (!attachmentTx) {
         setTimeout(() => {
           alert.show("Transaction created successfully", successOptions);
-        }, 1000)
+        }, 1000);
       }
       const trytes = await iota.prepareTransfers(seed, transfers);
       if (!attachmentTx) {
@@ -279,8 +271,6 @@ function App({ alert }) {
         });
     }, 10000);
   };
-
-  const isMyAddress = address => accountData.addresses.find(a => a === address);
 
   const renderAddress = address => (
     <>
@@ -352,6 +342,13 @@ function App({ alert }) {
         </button>
       </div>
       <div className="divider" />
+      <button
+        onClick={() => getLastUnusedAddress(accountData, alert)}
+        disabled={!isAccountSetup}
+        style={{ marginRight: "10px" }}
+      >
+        Get last unused address
+      </button>
       <button
         onClick={() => generateAndAttachNewAddress(iota, seed)}
         disabled={
